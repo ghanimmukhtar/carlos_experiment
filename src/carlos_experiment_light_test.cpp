@@ -57,7 +57,17 @@ void jocommCallback(sensor_msgs::JointState jo_state)
  */
 bool spawn_my_model(std::string& model_to_spawn, ros::ServiceClient& my_spawner, geometry_msgs::Pose& model_pose){
     gazebo_msgs::SpawnModel my_model;
-    std::string model_file_location = "/home/ghanim/.gazebo/models/" + model_to_spawn + "/model.sdf";
+    char* pPath;
+      pPath = getenv ("PWD");
+      if (pPath!=NULL)
+        std::cout << "The current path is: " << pPath << std::endl;
+    //std::string model_file_location = pPath + "/src/carlos_experiment/world/" + model_to_spawn + "/model.sdf";
+    std::string model_file_location;
+    model_file_location.append(pPath);
+    model_file_location.append("/src/carlos_experiment/world/");
+    model_file_location.append(model_to_spawn);
+    model_file_location.append("/model.sdf");
+    std::cout << "trying to spawn model: " << model_file_location.c_str() << std::endl;
     std::ifstream model_file(model_file_location.c_str());
     std::string line;
     while (!model_file.eof()) {
@@ -231,7 +241,15 @@ int main(int argc, char** argv)
   inter_point_position.push_back({object_pose.position.x + cube_side/2.0 + inter_point_dist, object_pose.position.y, -0.05}); //Back_mid
 
   //open a file to register feedback data after/during each action
-  feedback_data.open("/home/ghanim/git/data.csv");
+  char* pPath;
+    pPath = getenv ("PWD");
+    if (pPath!=NULL)
+      std::cout << "The current path is: " << pPath << std::endl;
+  std::string path_to_file;
+  path_to_file.append(pPath);
+  path_to_file.append("/src/carlos_experiment/data.csv");
+  std::cout << "feedback path is: " << path_to_file.c_str() << std::endl;
+  feedback_data.open(path_to_file.c_str());
   tf::Quaternion quat;
   //delete model
   gazebo_msgs::DeleteModel delete_model_cube, delete_model_table;
