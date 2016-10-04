@@ -49,6 +49,17 @@ void jocommCallback(sensor_msgs::JointState jo_state)
     right_arm_joint_values[6] = jo_state.position[18];
 }
 
+//return roll pitch yaw from the transformation matrix transform_l_ee_w
+Eigen::Vector3d extract_angles(Eigen::Matrix4d& transform_l_ee_w){
+    Eigen::Vector3d my_angles;
+    double Roll, Pitch, Yaw;
+    Roll = atan2(transform_l_ee_w(1, 0), transform_l_ee_w(0, 0));
+    Pitch = atan2(-transform_l_ee_w(2, 0), cos(Roll) * transform_l_ee_w(0, 0) + sin(Roll) * transform_l_ee_w(1, 0));
+    Yaw = atan2(sin(Roll) * transform_l_ee_w(0, 2) - cos(Roll) * transform_l_ee_w(1, 2), -sin(Roll) * transform_l_ee_w(0, 1) + cos(Roll) * transform_l_ee_w(1, 1));
+    my_angles << Roll, Pitch, Yaw;
+    return my_angles;
+}
+
 /**
  * @brief the function to spawn objects
  * @param name of the object to spawn, and its pose and the service client
@@ -173,6 +184,11 @@ int main(int argc, char** argv)
   spinner.start();
 
   usleep(2e6);
+
+  robot_model_loader::RobotModelLoader robot_model_loader("robot_description");
+  robot_model::RobotModelPtr robot_model = robot_model_loader.getModel();
+  robot_state::RobotState my_robot_state(robot_model);
+
   //move right arm to a safe position
   Eigen::Vector3d right_home = {0.0, -0.8, 0.2};
   double ang_x = 0, ang_y = M_PI, ang_z = 0;
@@ -386,6 +402,7 @@ int main(int argc, char** argv)
               my_trajectory_path.joint_names = {"left_s0", "left_s1", "left_e0", "left_e1", "left_w0", "left_w1", "left_w2"};
           }
           //execute the trajectory
+          feedback_position.clear(); feedback_orientation.clear();
           if(!my_trajectory_path.points.empty()){
               for (int j = 0; j < my_trajectory_path.points.size(); ++j){
                   baxter_core_msgs::JointCommand command_msg;
@@ -394,6 +411,13 @@ int main(int argc, char** argv)
                   command_msg.command = my_trajectory_path.points[j].positions;
                   pub_msg.publish(command_msg);
                   usleep(1e5);
+                  my_robot_state.setVariablePositions(my_trajectory_path.joint_names, my_trajectory_path.points[j].positions);
+                  Eigen::Affine3d f_trans_mat;
+                  f_trans_mat = my_robot_state.getGlobalLinkTransform("left_gripper");
+                  feedback_position.push_back(f_trans_mat.translation());
+                  Eigen::Matrix4d transform_l_ee_w = f_trans_mat.matrix();
+                  Eigen::Vector3d my_angles = extract_angles(transform_l_ee_w);
+                  feedback_orientation.push_back(my_angles);
               }
           }
           usleep(2e6);
